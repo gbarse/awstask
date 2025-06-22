@@ -9,7 +9,7 @@ phases:
       - pip install aws-sam-cli
   build:
     commands:
-      - echo "Building the project..."
+      - echo "Building the project g..."
       - mvn clean install
       - echo "Packaging with SAM..."
       - sam package --template-file templateSAM.yml --s3-bucket gor-barseghyan-site --output-template-file packaged.yml
