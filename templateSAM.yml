@@ -1,0 +1,36 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: GorB SAM Template (Minimal)
+
+Globals:
+  Function:
+    Runtime: java17
+    MemorySize: 512
+    Timeout: 30
+    Tracing: Active
+
+Resources:
+
+  GorBUploadsNotificationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: GorB-UploadsNotificationFunction
+      Handler: com.lambda.lambda.UploadNotificationHandler::handleRequest
+      CodeUri: ./target/lambda-0.0.1-SNAPSHOT.jar
+      Environment:
+        Variables:
+          SNS_TOPIC_ARN: arn:aws:sns:us-east-2:151182332702:GorB-Topic
+          APP_PUBLIC_IP: 3.136.49.129
+      Policies:
+        - SQSPollerPolicy:
+            QueueName: GorB-NotificationUploadQueue
+        - Statement:
+            Effect: Allow
+            Action: sns:Publish
+            Resource: arn:aws:sns:us-east-2:151182332702:GorB-Topic
+      Events:
+        SQSTrigger:
+          Type: SQS
+          Properties:
+            Queue: arn:aws:sqs:us-east-2:151182332702:GorB-NotificationUploadQueue
+            BatchSize: 5
