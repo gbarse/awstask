@@ -20,7 +20,7 @@ Resources:
       Environment:
         Variables:
           SNS_TOPIC_ARN: arn:aws:sns:us-east-2:151182332702:GorB-Topic
-          APP_PUBLIC_IP: 3.136.49.129
+          APP_PUBLIC_IP: 3.148.63.57
       Policies:
         - SQSPollerPolicy:
             QueueName: GorB-NotificationUploadQueue
