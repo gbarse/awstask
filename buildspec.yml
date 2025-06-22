@@ -5,18 +5,17 @@ phases:
     runtime-versions:
       java: corretto17
     commands:
-      - echo "Installing SAM CLI..."
-      - pip install aws-sam-cli
+      - echo "Installing SAM CLI …"
+      - pip install --quiet aws-sam-cli
   build:
     commands:
-      - echo "Building the project..."
-      - mvn clean install
-      - echo "Packaging with SAM..."
-      - sam package \
-          --template-file templateSAM.yml \
-          --s3-bucket gor-barseghyan-site \
-          --output-template-file packaged.yml
+      - echo "Building JAR …"
+      - mvn -B clean package             # creates target/lambda-0.0.1-SNAPSHOT.jar
+      - echo "Packaging with SAM …"
+      - sam package --template-file templateSAM.yml \
+                    --s3-bucket gor-barseghyan-site \
+                    --output-template-file packaged.yml
 artifacts:
-  type: zip
   files:
-    - packaged.yml
+    - packaged.yml                       # <- CodePipeline deploy stage needs this
+  discard-paths: yes
