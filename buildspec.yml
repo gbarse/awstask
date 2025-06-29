@@ -21,9 +21,8 @@ phases:
   build:
     commands:
       - echo "🐳  Building Docker image"
-      - cd $CODEBUILD_SRC_DIR
-      - mvn -q clean package                       # builds app.jar **and** Lambda jar
-      - docker build -t "$IMAGE_URI" .             # the dot assumes Dockerfile is in repo root
+      - mvn -q clean package             # pom.xml is already in CWD
+      - docker build -t "$IMAGE_URI" .   # CWD contains Dockerfile             # the dot assumes Dockerfile is in repo root
                                                    # if not -> use  -f path/to/Dockerfile  <context>
       - echo "☁️  Packaging Lambda with SAM"
       - sam package \
