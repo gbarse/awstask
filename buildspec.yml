@@ -4,45 +4,46 @@ phases:
   install:
     runtime-versions:
       java: corretto17
+      docker: 20      # let CodeBuild run Docker commands
     commands:
-      - echo "Installing SAM CLI …"
-      - pip install aws-sam-cli
+      - echo "🔧  Installing SAM CLI …"
+      - pip install --quiet aws-sam-cli
+
   pre_build:
     commands:
       - echo "🔐  Logging in to ECR"
       - aws ecr get-login-password --region us-east-2 \
         | docker login --username AWS --password-stdin 151182332702.dkr.ecr.us-east-2.amazonaws.com
+      # tag every image with the Git commit SHA so we can roll back if needed
+      - IMAGE_TAG=${CODEBUILD_RESOLVED_SOURCE_VERSION:-latest}
+      - IMAGE_URI=151182332702.dkr.ecr.us-east-2.amazonaws.com/gorb/aws-task:${IMAGE_TAG}
+      - echo "Using tag $IMAGE_TAG"
+
   build:
     commands:
-      # ────────────── 1. Build + tag the DOCKER image exactly as you do locally ──────────────
       - echo "🐳  Building Docker image"
-      - docker build -t gorb/aws-task .
-      - docker tag gorb/aws-task:latest 151182332702.dkr.ecr.us-east-2.amazonaws.com/gorb/aws-task:latest
-
-      # ────────────── 2. Package the SAM template for Lambda (unchanged) ──────────────
-      - echo "☁️  Building Lambda SAM package"
-      - mvn -q clean package
-      - sam package                                   \
-          --template-file templateSAM.yml             \
-          --s3-bucket gor-barseghyan-site             \
+      - mvn -q clean package            # produces target/*.jar for the container **and** Lambda jar
+      - docker build -t $IMAGE_URI .
+      - echo "☁️  Packaging Lambda with SAM"
+      - sam package \
+          --template-file templateSAM.yml \
+          --s3-bucket gor-barseghyan-site \
           --output-template-file packaged.yml
+
   post_build:
     commands:
       - echo "📤  Pushing image to ECR"
-      - docker push 151182332702.dkr.ecr.us-east-2.amazonaws.com/gorb/aws-task:latest
-
-      # imagedefinitions.json must use the **container name** that’s in your task-def
-      # (looks like “GorB-image-app”).  If you named the container differently,
-      # change the value of name accordingly.
-      - echo "📝  Creating imagedefinitions.json"
-      - printf '[{"name":"GorB-image-app","imageUri":"151182332702.dkr.ecr.us-east-2.amazonaws.com/gorb/aws-task:latest"}]' \
-        > imagedefinitions.json
+      - docker push $IMAGE_URI
+      - echo "📝  Creating imagedefinitions.json for ECS"
+      - printf '[{"name":"GorB-image-app","imageUri":"%s"}]' "$IMAGE_URI" > imagedefinitions.json
 
 artifacts:
   secondary-artifacts:
-    ecsArtifact:
+    ecsArtifact:        # ⬅️ will feed the ECS deploy stage
+      base-directory: .
       files:
         - imagedefinitions.json
-    lambdaArtifact:
+    lambdaArtifact:     # ⬅️ will feed the Lambda deploy stage
+      base-directory: .
       files:
         - packaged.yml
