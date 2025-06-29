@@ -11,7 +11,7 @@ phases:
   pre_build:
     commands:
       - echo "🔐  Logging in to ECR"
-      - aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 151182332702.dkr.ecr.us-east-2.amazonaws.com
+      - docker login --username AWS --password $(aws ecr get-login-password --region us-east-2) 151182332702.dkr.ecr.us-east-2.amazonaws.com
       # tag every image with the Git commit SHA so we can roll back if needed
       - IMAGE_TAG=${CODEBUILD_RESOLVED_SOURCE_VERSION:-latest}
       - IMAGE_URI=151182332702.dkr.ecr.us-east-2.amazonaws.com/gorb/aws-task:${IMAGE_TAG}
