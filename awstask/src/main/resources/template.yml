@@ -1,0 +1,62 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: GorB SAM Template with SQS trigger and SNS publishing
+
+Globals:
+  Function:
+    Runtime: java17
+    MemorySize: 512
+    Timeout: 30
+    Tracing: Active
+
+Resources:
+
+  GorBLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: GorB-LambdaExecutionRole
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: LambdaSQSSNSLogsPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sqs:ReceiveMessage
+                  - sqs:DeleteMessage
+                  - sqs:GetQueueAttributes
+                Resource: arn:aws:sqs:us-east-2:151182332702:GorB-NotificationUploadQueue
+              - Effect: Allow
+                Action: sns:Publish
+                Resource: arn:aws:sns:us-east-2:151182332702:GorB-Topic
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "*"
+
+  GorBUploadsNotificationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: GorB-UploadsNotificationFunction
+      Handler: com.lambda.lambda.UploadNotificationHandler::handleRequest
+      CodeUri: ./target/lambda-0.0.1-SNAPSHOT.jar
+      Role: !GetAtt GorBLambdaExecutionRole.Arn
+      Environment:
+        Variables:
+          SNS_TOPIC_ARN: arn:aws:sns:us-east-2:151182332702:GorB-Topic
+          APP_PUBLIC_IP: 3.136.49.129
+      Events:
+        SQSTrigger:
+          Type: SQS
+          Properties:
+            Queue: arn:aws:sqs:us-east-2:151182332702:GorB-NotificationUploadQueue
+            BatchSize: 5

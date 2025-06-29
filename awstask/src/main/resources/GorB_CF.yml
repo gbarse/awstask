@@ -1,0 +1,210 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Parameters:
+  GorBAMI:
+    Description: AMI ID for EC2 Instances
+    Type: String
+    Default: ami-080e3c603811e01d6
+  GorBInstanceType:
+    Description: EC2 Instance Type
+    Type: String
+    Default: t2.micro
+
+Resources:
+  MyS3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: gor-barseghyan-site-cf
+
+  GorBVPCCFnetwork:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: GorBVPCCF-network
+
+  GorBIG:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: GorBIG
+
+  GorBIGAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref GorBVPCCFnetwork
+      InternetGatewayId: !Ref GorBIG
+
+  GorBPublicSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref GorBVPCCFnetwork
+      CidrBlock: 10.0.11.0/24
+      AvailabilityZone: !Select [ 0, !GetAZs 'us-east-2' ]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: GorBPublicSubnet-CF-A
+
+  GorBPublicSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref GorBVPCCFnetwork
+      CidrBlock: 10.0.12.0/24
+      AvailabilityZone: !Select [ 1, !GetAZs 'us-east-2' ]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: GorBPublicSubnet-CF-B
+
+  SSHSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow SSH from My IP
+      VpcId: !Ref GorBVPCCFnetwork
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp:  83.139.24.154/32
+      Tags:
+        - Key: Name
+          Value: GorBCF-SecGr1
+
+  WebSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow HTTP/HTTPS
+      VpcId: !Ref GorBVPCCFnetwork
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: GorBCF-SecGr2
+
+  GorBPublicRouteTableCF:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref GorBVPCCFnetwork
+      Tags:
+        - Key: Name
+          Value: GorBPublicRouteTableCF
+
+  GorBDefaultRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref GorBPublicRouteTableCF
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref GorBIG
+
+  PublicSubnetAAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref GorBPublicSubnetA
+      RouteTableId: !Ref GorBPublicRouteTableCF
+
+  PublicSubnetBAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref GorBPublicSubnetB
+      RouteTableId: !Ref GorBPublicRouteTableCF
+
+  GorBStandaloneEC2:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref GorBInstanceType
+      ImageId: !Ref GorBAMI
+      SubnetId: !Ref GorBPublicSubnetA
+      SecurityGroupIds:
+        - !Ref SSHSecurityGroup
+        - !Ref WebSecurityGroup
+      KeyName: Gor_Barsegyan_EC2_task_key_pair
+      Tags:
+        - Key: Name
+          Value: GorBStandalone-CF-EC2-Instance
+
+  GorBLaunchTemplateCF:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: GorBLaunchTemplateCF
+      LaunchTemplateData:
+        ImageId: !Ref GorBAMI
+        InstanceType: !Ref GorBInstanceType
+        SecurityGroupIds:
+          - !Ref SSHSecurityGroup
+          - !Ref WebSecurityGroup
+        TagSpecifications:
+          - ResourceType: instance
+            Tags:
+              - Key: Name
+                Value: GorBEC2-CF-AS-Instance
+
+  GorBAutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      AutoScalingGroupName: GorBAutoScalingGroup
+      VPCZoneIdentifier:
+        - !Ref GorBPublicSubnetA
+        - !Ref GorBPublicSubnetB
+      LaunchTemplate:
+        LaunchTemplateId: !Ref GorBLaunchTemplateCF
+        Version: !GetAtt GorBLaunchTemplateCF.LatestVersionNumber
+      MinSize: '1'
+      MaxSize: '3'
+      DesiredCapacity: '1'
+      Tags:
+        - Key: Name
+          Value: GorBAutoScaling-CF-Instance
+          PropagateAtLaunch: true
+
+  GorBScaleUpPolicy:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AutoScalingGroupName: !Ref GorBAutoScalingGroup
+      PolicyType: TargetTrackingScaling
+      TargetTrackingConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ASGAverageCPUUtilization
+        TargetValue: 50.0
+
+  GorBLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: GorBLoadBalancer
+      Subnets:
+        - !Ref GorBPublicSubnetA
+        - !Ref GorBPublicSubnetB
+      SecurityGroups:
+        - !Ref WebSecurityGroup
+      Scheme: internet-facing
+      Type: application
+
+  GorBTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      VpcId: !Ref GorBVPCCFnetwork
+      Port: 80
+      Protocol: HTTP
+      TargetType: instance
+      HealthCheckPath: /
+
+  GorBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref GorBLoadBalancer
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref GorBTargetGroup

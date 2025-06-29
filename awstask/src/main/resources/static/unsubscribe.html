@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Unsubscribe from Notifications</title>
+</head>
+<body>
+<h1>Unsubscribe from Image Upload Notifications</h1>
+<form id="unsubscribeForm">
+    <input type="email" id="email" placeholder="Enter your email" required />
+    <button type="submit">Unsubscribe</button>
+</form>
+<p id="response"></p>
+
+<script>
+    document.getElementById("unsubscribeForm").addEventListener("submit", function (e) {
+        e.preventDefault();
+        const email = document.getElementById("email").value;
+
+        fetch("/notifications/unsubscribe?email=" + encodeURIComponent(email), {
+            method: "POST"
+        })
+        .then(res => res.text())
+        .then(msg => document.getElementById("response").textContent = msg)
+        .catch(err => document.getElementById("response").textContent = "Error: " + err);
+    });
+</script>
+</body>
+</html>

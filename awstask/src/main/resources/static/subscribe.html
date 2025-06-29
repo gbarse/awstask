@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Subscribe to Notifications</title>
+</head>
+<body>
+<h1>Subscribe to Image Upload Notifications</h1>
+<form id="subscribeForm">
+    <input type="email" id="email" placeholder="Enter your email" required />
+    <button type="submit">Subscribe</button>
+</form>
+<p id="response"></p>
+
+<script>
+    document.getElementById("subscribeForm").addEventListener("submit", function (e) {
+        e.preventDefault();
+        const email = document.getElementById("email").value;
+
+        fetch("/notifications/subscribe?email=" + encodeURIComponent(email), {
+            method: "POST"
+        })
+        .then(res => res.text())
+        .then(msg => document.getElementById("response").textContent = msg)
+        .catch(err => document.getElementById("response").textContent = "Error: " + err);
+    });
+</script>
+</body>
+</html>

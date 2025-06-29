@@ -1,0 +1,303 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: |
+  GorB – complete Fargate stack
+  • ALB + ECS/Fargate service (auto-scales 1↔2 tasks)
+  • DynamoDB table for image analytics
+  • Optional private ECR repo (retained on stack delete)
+
+###############################################################################
+# 1 – Parameters                                                               #
+###############################################################################
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC where the service will run
+
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet::Id
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet::Id
+
+  RdsSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: Existing security-group attached to the RDS instance
+
+  ImageUri:
+    Type: String
+    Default: 151182332702.dkr.ecr.us-east-2.amazonaws.com/gorb/aws-task:latest
+
+  RdsEndpoint:
+    Type: String
+    Default: gordb-rds-db.c124206solfi.us-east-2.rds.amazonaws.com
+
+  S3Bucket:
+    Type: String
+    Default: gor-barseghyan-site
+
+  SqsQueueUrl:
+    Type: String
+    Default: https://sqs.us-east-2.amazonaws.com/151182332702/GorB-NotificationUploadQueue
+
+  AwsRegion:
+    Type: String
+    Default: us-east-2
+
+  AppPort:
+    Type: Number
+    Default: 80
+
+###############################################################################
+# 2 – Resources                                                                #
+###############################################################################
+Resources:
+
+  #────────────────────────── Data plane ─────────────────────────────────────#
+  GorBImageAnalyticsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: GorB-ImageAnalytics
+      AttributeDefinitions:
+        - AttributeName: image_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: image_id
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+
+  GorBImageRepo:
+    Type: AWS::ECR::Repository
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      RepositoryName: gorb/aws-task
+      ImageScanningConfiguration: { ScanOnPush: true }
+
+  GorBLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /ecs/GorB-image-app
+      RetentionInDays: 14
+
+  #────────────────────────── IAM roles ──────────────────────────────────────#
+  GorBExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ecs-tasks.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+
+  GorBTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ecs-tasks.amazonaws.com }
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: GorB-image-app-permissions
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: s3:*
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - sns:Publish
+                  - sns:Subscribe
+                  - sns:Unsubscribe
+                  - sns:ListSubscriptionsByTopic
+                Resource: arn:aws:sns:us-east-2:151182332702:GorB-Topic
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - sqs:GetQueueUrl
+                  - sqs:SendMessage
+                  - sqs:ReceiveMessage
+                  - sqs:DeleteMessage
+                  - sqs:GetQueueAttributes
+                Resource: arn:aws:sqs:us-east-2:151182332702:GorB-NotificationUploadQueue
+              - Effect: Allow   # DynamoDB counters
+                Action:
+                  - dynamodb:UpdateItem
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                Resource: !GetAtt GorBImageAnalyticsTable.Arn
+
+  #───────────────────────── Security groups ─────────────────────────────────#
+  GorBAlbSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow public HTTP to ALB
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+
+  GorBTaskSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow ALB - Fargate task
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: !Ref AppPort
+          ToPort:   !Ref AppPort
+          SourceSecurityGroupId: !Ref GorBAlbSG
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+
+  GorBRdsIngressFromTask:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId:              !Ref RdsSecurityGroupId
+      IpProtocol:           tcp
+      FromPort:             3306
+      ToPort:               3306
+      SourceSecurityGroupId: !Ref GorBTaskSG
+
+  #────────────────────────── Load Balancer ──────────────────────────────────#
+  GorBAlb:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: GorB-image-app-alb
+      Scheme: internet-facing
+      Subnets: [ !Ref PublicSubnet1, !Ref PublicSubnet2 ]
+      SecurityGroups: [ !Ref GorBAlbSG ]
+      Type: application
+
+  GorBTg:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: GorB-image-app-tg
+      TargetType: ip
+      Port: !Ref AppPort
+      Protocol: HTTP
+      VpcId: !Ref VpcId
+      HealthCheckPath: /
+      Matcher: { HttpCode: '200' }
+
+  GorBAlbListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref GorBAlb
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref GorBTg
+
+  #───────────────────────────── ECS / Fargate ───────────────────────────────#
+  GorBCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: GorB-image-app-cluster
+
+  GorBTaskDef:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: GorB-image-app
+      Cpu: '256'
+      Memory: '512'
+      NetworkMode: awsvpc
+      RequiresCompatibilities: [ FARGATE ]
+      ExecutionRoleArn: !GetAtt GorBExecutionRole.Arn
+      TaskRoleArn:      !GetAtt GorBTaskRole.Arn
+      ContainerDefinitions:
+        - Name: GorB-image-app
+          Image: !Ref ImageUri
+          PortMappings:
+            - ContainerPort: !Ref AppPort
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group:  /ecs/GorB-image-app
+              awslogs-region: !Ref AwsRegion
+              awslogs-stream-prefix: GorB-image
+          Environment:
+            - Name: AWS_REGION
+              Value: !Ref AwsRegion
+            - Name: S3_BUCKET
+              Value: !Ref S3Bucket
+            - Name: SQS_QUEUE_URL
+              Value: !Ref SqsQueueUrl
+            - Name: DDB_TABLE
+              Value: GorB-ImageAnalytics
+            - Name: RDS_ENDPOINT
+              Value: !Ref RdsEndpoint
+
+  GorBService:
+    Type: AWS::ECS::Service
+    DependsOn: GorBAlbListener
+    Properties:
+      Cluster:       !Ref GorBCluster
+      ServiceName:   GorB-image-app-svc
+      LaunchType:    FARGATE
+      DesiredCount:  1
+      TaskDefinition: !Ref GorBTaskDef
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          SecurityGroups: [ !Ref GorBTaskSG ]
+          Subnets: [ !Ref PublicSubnet1, !Ref PublicSubnet2 ]
+      LoadBalancers:
+        - ContainerName:  GorB-image-app
+          ContainerPort:  !Ref AppPort
+          TargetGroupArn: !Ref GorBTg
+
+  #──────────────────── Service auto-scaling (1 ↔ 2) ─────────────────────────#
+  GorBScalableTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    DependsOn: GorBService
+    Properties:
+      MaxCapacity: 2
+      MinCapacity: 1
+      ResourceId: !Sub service/GorB-image-app-cluster/GorB-image-app-svc
+      ScalableDimension: ecs:service:DesiredCount
+      ServiceNamespace:  ecs
+
+  GorBCpuScalingPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: GorB-CPU70
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref GorBScalableTarget
+      TargetTrackingScalingPolicyConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ECSServiceAverageCPUUtilization
+        TargetValue: 70
+        ScaleInCooldown: 60
+        ScaleOutCooldown: 60
+
+###############################################################################
+# 3 – Outputs                                                                  #
+###############################################################################
+Outputs:
+  AlbDNSName:
+    Description: Public DNS of the Application Load Balancer
+    Value: !GetAtt GorBAlb.DNSName
+
+  DynamoDBTableName:
+    Description: Image analytics DynamoDB table
+    Value: !Ref GorBImageAnalyticsTable
+
+  ServiceName:
+    Value: !Ref GorBService
+
+  ClusterName:
+    Value: !Ref GorBCluster

@@ -1,0 +1,61 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: SNS + SQS + Lambda Notification Architecture for GorB
+
+Resources:
+
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: GorB-LambdaExecutionRole
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: GorB-LambdaPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sqs:ReceiveMessage
+                  - sqs:DeleteMessage
+                  - sqs:GetQueueAttributes
+                Resource: arn:aws:sqs:us-east-2:151182332702:GorB-NotificationUploadQueue
+              - Effect: Allow
+                Action: sns:Publish
+                Resource: arn:aws:sns:us-east-2:151182332702:GorB-Topic
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "*"
+
+  UploadNotificationFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: GorB-UploadsNotificationFunction
+      Handler: com.lambda.lambda.UploadNotificationHandler::handleRequest
+      Runtime: java17
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: gor-barseghyan-site
+        S3Key: lambda-0.0.1-SNAPSHOT.jar
+      Timeout: 30
+      MemorySize: 512
+      Environment:
+        Variables:
+          SNS_TOPIC_ARN: arn:aws:sns:us-east-2:151182332702:GorB-Topic
+          APP_PUBLIC_IP: 18.222.89.37
+
+  LambdaSQSTrigger:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      EventSourceArn: arn:aws:sqs:us-east-2:151182332702:GorB-NotificationUploadQueue
+      FunctionName: !Ref UploadNotificationFunction
+      BatchSize: 5
+      Enabled: true

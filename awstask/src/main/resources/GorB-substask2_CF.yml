@@ -1,0 +1,180 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: GorB - Lambda Data Consistency Check with API Gateway and Scheduled EventBridge
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: GorB-subtask2
+
+  LambdaJarS3Bucket:
+    Type: String
+    Default: gor-barseghyan-site
+
+  LambdaJarS3Key:
+    Type: String
+    Default: lambda1-0.0.1-SNAPSHOT.jar
+
+  RdsEndpoint:
+    Type: String
+    Description: RDS endpoint without jdbc prefix or database name
+    Default: gordb-rds-db.c124206solfi.us-east-2.rds.amazonaws.com
+
+  RdsDatabase:
+    Type: String
+    Default: metadata
+
+  DbUser:
+    Type: String
+    Default: admin
+
+  DbPassword:
+    Type: String
+    Default: adminADMIN
+
+  S3BucketName:
+    Type: String
+    Default: gor-barseghyan-site
+
+Resources:
+
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-LambdaExecutionRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: LambdaBasicExecution
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - ec2:CreateNetworkInterface
+                  - ec2:DescribeNetworkInterfaces
+                  - ec2:DeleteNetworkInterface
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - s3:ListBucket
+                Resource: arn:aws:s3:::gor-barseghyan-site
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource: arn:aws:s3:::gor-barseghyan-site/*
+              - Effect: Allow
+                Action:
+                  - rds-db:connect
+                Resource: "*"
+
+  DataConsistencyFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub ${ProjectName}-DataConsistencyFunction
+      Handler: com.lambda1.lambda1.DataConsistencyFunction::handleRequest
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Runtime: java17
+      MemorySize: 512
+      Timeout: 30
+      Code:
+        S3Bucket: !Ref LambdaJarS3Bucket
+        S3Key: !Ref LambdaJarS3Key
+      Environment:
+        Variables:
+          DB_URL: !Sub jdbc:mysql://${RdsEndpoint}:3306/${RdsDatabase}
+          DB_USER: !Ref DbUser
+          DB_PASSWORD: !Ref DbPassword
+          S3_BUCKET_NAME: !Ref S3BucketName
+      VpcConfig:
+        SecurityGroupIds:
+          - sg-0ad746a40c0e68896
+        SubnetIds:
+          - subnet-09831cfb7382ef4a7
+          - subnet-0120ab8854ed12faa
+
+  LambdaInvokePermissionForAPIGateway:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref DataConsistencyFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${APIGatewayRestApi}/*/POST/trigger
+
+
+  LambdaInvokePermissionForEventBridge:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref DataConsistencyFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+
+  APIGatewayRestApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: !Sub ${ProjectName}-ConsistencyAPI
+
+  APIGatewayResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref APIGatewayRestApi
+      ParentId: !GetAtt APIGatewayRestApi.RootResourceId
+      PathPart: trigger
+
+  APIGatewayMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref APIGatewayRestApi
+      ResourceId: !Ref APIGatewayResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: HTTP_PROXY
+        IntegrationHttpMethod: POST
+        Uri: http://18.222.89.37/trigger
+
+
+  APIDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn: APIGatewayMethod
+    Properties:
+      RestApiId: !Ref APIGatewayRestApi
+      StageName: prod
+
+  ScheduleRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub ${ProjectName}-ScheduleRule
+      ScheduleExpression: rate(2 minutes)
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt DataConsistencyFunction.Arn
+          Id: DataConsistencyFunctionTarget
+          Input: '{ "source": "scheduled" }'
+
+  S3GatewayVPCEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.s3
+      VpcId: vpc-0214720781e6cc2d3
+      RouteTableIds:
+        - rtb-0cfccbd732ed03267
+      VpcEndpointType: Gateway
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: "*"
+            Action: s3:ListBucket
+            Resource: arn:aws:s3:::gor-barseghyan-site
+
+Outputs:
+  ApiEndpoint:
+    Value: !Sub https://${APIGatewayRestApi}.execute-api.${AWS::Region}.amazonaws.com/prod/trigger
