@@ -21,6 +21,7 @@ phases:
   build:
     commands:
       - echo "🐳  Building Docker image"
+      - cd $CODEBUILD_SRC_DIR
       - mvn -q clean package                       # builds app.jar **and** Lambda jar
       - docker build -t "$IMAGE_URI" .             # the dot assumes Dockerfile is in repo root
                                                    # if not -> use  -f path/to/Dockerfile  <context>
