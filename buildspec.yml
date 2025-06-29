@@ -1,0 +1,41 @@
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - echo "🔐 Logging in to ECR"
+      - aws ecr get-login-password --region us-east-2 \
+        | docker login --username AWS --password-stdin 151182332702.dkr.ecr.us-east-2.amazonaws.com
+      - REPO_URI=151182332702.dkr.ecr.us-east-2.amazonaws.com/gorb/aws-task
+      - IMAGE_TAG=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c1-7)
+
+  build:
+    commands:
+      # ── 1️⃣  build the web-app JAR ───────────────────────────────
+      - echo "🛠  Building Spring-Boot web app"
+      - mvn -q -f awstask/pom.xml -DskipTests package
+
+      # ── 2️⃣  build + tag Docker image ───────────────────────────
+      - echo "🐳  Building Docker image"
+      - docker build -t $REPO_URI:$IMAGE_TAG -f awstask/Dockerfile awstask
+      - docker tag  $REPO_URI:$IMAGE_TAG  $REPO_URI:latest
+
+      # ── 3️⃣  build the Lambda JAR ───────────────────────────────
+      - echo "🛠  Building Lambda shaded JAR"
+      - mvn -q -f lambda/pom.xml -Pshade -DskipTests package
+
+      # ── 4️⃣  package SAM template ──────────────────────────────
+      - sam build --template-file templateSAM.yml && sam package --template-file templateSAM.yml --s3-bucket gor-barseghyan-site-cf --output-template-file packaged.yml
+
+  post_build:
+    commands:
+      - echo "📤 Pushing Docker image"
+      - docker push $REPO_URI:$IMAGE_TAG
+      - docker push $REPO_URI:latest
+      - echo "📝 Writing imagedefinitions.json"
+      - printf '[{"name":"GorB-image-app","imageUri":"%s"}]' $REPO_URI:$IMAGE_TAG > imagedefinitions.json
+
+artifacts:
+  files:
+    - imagedefinitions.json
+    - packaged.yml
