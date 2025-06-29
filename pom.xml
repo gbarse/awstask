@@ -1,120 +1,168 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="
-            http://maven.apache.org/POM/4.0.0
-            https://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<parent>
+		<groupId>org.springframework.boot</groupId>
+		<artifactId>spring-boot-starter-parent</artifactId>
+		<version>3.4.5</version>
+		<relativePath/> <!-- lookup parent from repository -->
+	</parent>
+	<groupId>com.awsdemo</groupId>
+	<artifactId>awstask</artifactId>
+	<version>0.0.1-SNAPSHOT</version>
+	<packaging>jar</packaging>
+	<name>awstask</name>
+	<description>Demo project for Spring Boot</description>
+	<url/>
+	<licenses>
+		<license/>
+	</licenses>
+	<developers>
+		<developer/>
+	</developers>
+	<scm>
+		<connection/>
+		<developerConnection/>
+		<tag/>
+		<url/>
+	</scm>
+	<properties>
+		<java.version>17</java.version>
+	</properties>
+	<dependencies>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-web</artifactId>
+		</dependency>
 
-  <modelVersion>4.0.0</modelVersion>
+		<dependency>
+			<groupId>software.amazon.awssdk</groupId>
+			<artifactId>s3</artifactId>
+			<version>2.25.30</version>
+		</dependency>
 
-  <!-- ───────── project coordinates ───────── -->
-  <groupId>com.gorb</groupId>
-  <artifactId>aws-task</artifactId>
-  <version>0.0.1-SNAPSHOT</version>
-  <packaging>jar</packaging>
+		<dependency>
+			<groupId>com.fasterxml.jackson.core</groupId>
+			<artifactId>jackson-databind</artifactId>
+		</dependency>
 
-  <!-- Spring Boot BOM -->
-  <parent>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-starter-parent</artifactId>
-    <version>3.5.0</version>
-  </parent>
+		<dependency>
+			<groupId>commons-io</groupId>
+			<artifactId>commons-io</artifactId>
+			<version>2.15.1</version>
+		</dependency>
 
-  <properties>
-    <java.version>17</java.version>
-    <aws.sdk.version>2.25.10</aws.sdk.version>
-    <lambda.core.version>1.2.3</lambda.core.version>
-    <lambda.events.version>3.11.1</lambda.events.version>
-  </properties>
+		<dependency>
+			<groupId>com.mysql</groupId>
+			<artifactId>mysql-connector-j</artifactId>
+			<version>9.2.0</version>
+		</dependency>
 
-  <!-- ───────── dependencies ───────── -->
-  <dependencies>
-    <!-- web app -->
-    <dependency>
-      <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-starter-web</artifactId>
-    </dependency>
+		<dependency>
+			<groupId>software.amazon.awssdk</groupId>
+			<artifactId>sqs</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>software.amazon.awssdk</groupId>
+			<artifactId>sns</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>software.amazon.awssdk</groupId>
+			<artifactId>lambda</artifactId>
+			<version>2.25.10</version> <!-- or latest -->
+		</dependency>
 
-    <!-- tests -->
-    <dependency>
-      <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-starter-test</artifactId>
-      <scope>test</scope>
-    </dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-jpa</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>com.mysql</groupId>
+			<artifactId>mysql-connector-j</artifactId>
+			<scope>runtime</scope>
+		</dependency>
+		<dependency>
+			<groupId>software.amazon.awssdk</groupId>
+			<artifactId>dynamodb</artifactId>
+		</dependency>
 
-    <!-- Lambda & AWS SDK (both web and Lambda jars can share these) -->
-    <dependency>
-      <groupId>com.amazonaws</groupId>
-      <artifactId>aws-lambda-java-core</artifactId>
-      <version>${lambda.core.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>com.amazonaws</groupId>
-      <artifactId>aws-lambda-java-events</artifactId>
-      <version>${lambda.events.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>software.amazon.awssdk</groupId>
-      <artifactId>sns</artifactId>
-      <version>${aws.sdk.version}</version>
-    </dependency>
+		<dependency>
+			<groupId>com.amazonaws</groupId>
+			<artifactId>aws-java-sdk-ec2</artifactId>
+			<version>1.12.783</version>
+		</dependency>
 
-    <!-- Jackson (already pulled by Spring Boot, but kept explicit) -->
-    <dependency>
-      <groupId>com.fasterxml.jackson.core</groupId>
-      <artifactId>jackson-databind</artifactId>
-    </dependency>
-  </dependencies>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<artifactId>lombok</artifactId>
+			<groupId>org.projectlombok</groupId>
+			<scope>provided</scope>
+		</dependency>
+	</dependencies>
 
-  <!-- ───────── build + plugins ───────── -->
-  <build>
-    <plugins>
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>software.amazon.awssdk</groupId>
+				<artifactId>bom</artifactId>
+				<version>2.25.10</version> <!-- or latest -->
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
 
-      <!-- 1️⃣  Spring-Boot plugin: makes target/app.jar executable -->
-      <plugin>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-maven-plugin</artifactId>
-        <configuration>
-          <!-- force the name “app.jar” → matches ENTRYPOINT in Dockerfile -->
-          <finalName>app</finalName>
-          <layers enabled="true"/>
-        </configuration>
-        <executions>
-          <execution>
-            <goals><goal>repackage</goal></goals>
-          </execution>
-        </executions>
-      </plugin>
+	<build>
+		<plugins>
 
-      <!-- 2️⃣  Shade plugin (ONLY when -Plambda is active) -->
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-shade-plugin</artifactId>
-        <version>3.4.1</version>
-        <executions>
-          <execution>
-            <id>shade-lambda</id>
-            <phase>package</phase>
-            <goals><goal>shade</goal></goals>
-            <configuration>
-              <shadedArtifactAttached>true</shadedArtifactAttached>
-              <shadedClassifierName>lambda</shadedClassifierName>
-              <createDependencyReducedPom>false</createDependencyReducedPom>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
+			<!-- 1️⃣ Spring-Boot plugin → creates target/app.jar -->
+			<plugin>
+				<groupId>org.springframework.boot</groupId>
+				<artifactId>spring-boot-maven-plugin</artifactId>
+				<configuration>
+					<finalName>app</finalName> <!-- matches Dockerfile ENTRYPOINT -->
+					<layers enabled="true"/>
+				</configuration>
+				<executions>
+					<execution>
+						<goals><goal>repackage</goal></goals>
+					</execution>
+				</executions>
+			</plugin>
 
-    </plugins>
-  </build>
+			<!-- 2️⃣ Shade plugin → only active in “lambda” profile -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-shade-plugin</artifactId>
+				<version>3.4.1</version>
+				<executions>
+					<execution>
+						<id>shade-lambda</id>
+						<phase>package</phase>
+						<goals><goal>shade</goal></goals>
+						<configuration>
+							<shadedClassifierName>lambda</shadedClassifierName>
+							<createDependencyReducedPom>false</createDependencyReducedPom>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
 
-  <!-- ───────── profiles ───────── -->
-  <profiles>
-    <!-- activate with:  mvn package -Plambda  -->
-    <profile>
-      <id>lambda</id>
-      <activation><activeByDefault>false</activeByDefault></activation>
-    </profile>
-  </profiles>
+		</plugins>
+	</build>
+
+	<!-- ───────── profiles ───────── -->
+	<profiles>
+		<profile>
+			<id>lambda</id>
+			<activation><activeByDefault>false</activeByDefault></activation>
+			<!-- nothing to add – just activates the Shade exec above -->
+		</profile>
+	</profiles>
 
 </project>
