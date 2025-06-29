@@ -21,6 +21,7 @@ phases:
 
       # ── 3️⃣  build the Lambda JAR ───────────────────────────────
       - echo "🛠  Building Lambda shaded JAR"
+      - mvn -q -f lambda/pom.xml -Pshade -DskipTests package
 
       # ── 4️⃣  package SAM template ──────────────────────────────
       - sam build --template-file templateSAM.yml && sam package --template-file templateSAM.yml --s3-bucket gor-barseghyan-site --output-template-file packaged.yml
