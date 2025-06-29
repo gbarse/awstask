@@ -21,7 +21,7 @@ phases:
   build:
     commands:
       - echo "🐳  Building Docker image"
-      - mvn -q clean package -Plambda             
+      - mvn -q clean package -DskipTests             
       - docker build -t "$IMAGE_URI" .   # CWD contains Dockerfile             # the dot assumes Dockerfile is in repo root
       - docker tag   "$IMAGE_URI" 151182332702.dkr.ecr.us-east-2.amazonaws.com/gorb/aws-task:latest   # <── NEW
                                                    # if not -> use  -f path/to/Dockerfile  <context>
