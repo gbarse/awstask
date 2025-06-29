@@ -5,16 +5,44 @@ phases:
     runtime-versions:
       java: corretto17
     commands:
-      - echo "Installing SAM CLI..."
+      - echo "Installing SAM CLI …"
       - pip install aws-sam-cli
+  pre_build:
+    commands:
+      - echo "🔐  Logging in to ECR"
+      - aws ecr get-login-password --region us-east-2 \
+        | docker login --username AWS --password-stdin 151182332702.dkr.ecr.us-east-2.amazonaws.com
   build:
     commands:
-      - echo "Building the project gor..."
-      - mvn clean install
-      - echo "Packaging with SAM..."
-      - sam package --template-file templateSAM.yml --s3-bucket gor-barseghyan-site --output-template-file packaged.yml
+      # ────────────── 1. Build + tag the DOCKER image exactly as you do locally ──────────────
+      - echo "🐳  Building Docker image"
+      - docker build -t gorb/aws-task .
+      - docker tag gorb/aws-task:latest 151182332702.dkr.ecr.us-east-2.amazonaws.com/gorb/aws-task:latest
+
+      # ────────────── 2. Package the SAM template for Lambda (unchanged) ──────────────
+      - echo "☁️  Building Lambda SAM package"
+      - mvn -q clean package
+      - sam package                                   \
+          --template-file templateSAM.yml             \
+          --s3-bucket gor-barseghyan-site             \
+          --output-template-file packaged.yml
+  post_build:
+    commands:
+      - echo "📤  Pushing image to ECR"
+      - docker push 151182332702.dkr.ecr.us-east-2.amazonaws.com/gorb/aws-task:latest
+
+      # imagedefinitions.json must use the **container name** that’s in your task-def
+      # (looks like “GorB-image-app”).  If you named the container differently,
+      # change the value of name accordingly.
+      - echo "📝  Creating imagedefinitions.json"
+      - printf '[{"name":"GorB-image-app","imageUri":"151182332702.dkr.ecr.us-east-2.amazonaws.com/gorb/aws-task:latest"}]' \
+        > imagedefinitions.json
 
 artifacts:
-  type: zip
-  files:
-    - packaged.yml
+  secondary-artifacts:
+    ecsArtifact:
+      files:
+        - imagedefinitions.json
+    lambdaArtifact:
+      files:
+        - packaged.yml
