@@ -16,7 +16,7 @@ Resources:
     Properties:
       FunctionName: GorB-UploadsNotificationFunction
       Handler: com.lambda.lambda.UploadNotificationHandler::handleRequest
-      CodeUri: ./target/lambda-0.0.1-SNAPSHOT.jar
+      CodeUri: lambda/target/lambda-0.0.1-SNAPSHOT.jar
       Environment:
         Variables:
           SNS_TOPIC_ARN: arn:aws:sns:us-east-2:151182332702:GorB-Topic
