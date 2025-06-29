@@ -23,6 +23,7 @@ phases:
       - echo "🐳  Building Docker image"
       - mvn -q clean package             # pom.xml is already in CWD
       - docker build -t "$IMAGE_URI" .   # CWD contains Dockerfile             # the dot assumes Dockerfile is in repo root
+      - docker tag   "$IMAGE_URI" 151182332702.dkr.ecr.us-east-2.amazonaws.com/gorb/aws-task:latest   # <── NEW
                                                    # if not -> use  -f path/to/Dockerfile  <context>
       - echo "☁️  Packaging Lambda with SAM"
       - sam package --template-file templateSAM.yml --s3-bucket gor-barseghyan-site --output-template-file packaged.yml
@@ -31,6 +32,7 @@ phases:
     commands:
       - echo "📤  Pushing image to ECR"
       - docker push "$IMAGE_URI"
+      - docker push 151182332702.dkr.ecr.us-east-2.amazonaws.com/gorb/aws-task:latest
 
       # ---- artifact for ECS deploy stage ----
       - echo "📝  Creating imagedefinitions.json"
