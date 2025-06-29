@@ -11,8 +11,11 @@ phases:
   pre_build:
     commands:
       - echo "🔐  Logging in to ECR"
-      - docker login --username AWS --password $(aws ecr get-login-password --region us-east-2) 151182332702.dkr.ecr.us-east-2.amazonaws.com
-      # tag every image with the Git commit SHA so we can roll back if needed
+      - docker login --username AWS \
+          --password "$(aws ecr get-login-password --region us-east-2)" \
+          151182332702.dkr.ecr.us-east-2.amazonaws.com
+
+      # tag every image with the Git commit SHA (handy for roll-backs)
       - IMAGE_TAG=${CODEBUILD_RESOLVED_SOURCE_VERSION:-latest}
       - IMAGE_URI=151182332702.dkr.ecr.us-east-2.amazonaws.com/gorb/aws-task:${IMAGE_TAG}
       - echo "Using tag $IMAGE_TAG"
@@ -20,10 +23,9 @@ phases:
   build:
     commands:
       - echo "🐳  Building Docker image"
-      - mvn -q clean package            # produces target/*.jar for the container **and** Lambda jar
-      - docker build -t gorb/aws-task .
-      - docker tag gorb/aws-task:latest 151182332702.dkr.ecr.us-east-2.amazonaws.com/gorb/aws-task:latest
-
+      - mvn -q clean package                       # builds app.jar **and** Lambda jar
+      - docker build -t "$IMAGE_URI" .             # the dot assumes Dockerfile is in repo root
+                                                   # if not -> use  -f path/to/Dockerfile  <context>
       - echo "☁️  Packaging Lambda with SAM"
       - sam package \
           --template-file templateSAM.yml \
@@ -33,17 +35,21 @@ phases:
   post_build:
     commands:
       - echo "📤  Pushing image to ECR"
-      - docker push $IMAGE_URI
-      - echo "📝  Creating imagedefinitions.json for ECS"
+      - docker push "$IMAGE_URI"
+
+      # ---- artifact for ECS deploy stage ----
+      - echo "📝  Creating imagedefinitions.json"
       - printf '[{"name":"GorB-image-app","imageUri":"%s"}]' "$IMAGE_URI" > imagedefinitions.json
 
 artifacts:
+  files:                       # <- makes CodeBuild happy (primary artifact)
+    - imagedefinitions.json
   secondary-artifacts:
-    ecsArtifact:        # ⬅️ will feed the ECS deploy stage
+    ecsArtifact:
       base-directory: .
       files:
         - imagedefinitions.json
-    lambdaArtifact:     # ⬅️ will feed the Lambda deploy stage
+    lambdaArtifact:
       base-directory: .
       files:
         - packaged.yml
