@@ -21,7 +21,7 @@ phases:
     commands:
       - echo "🐳  Building Docker image"
       - mvn -q clean package            # produces target/*.jar for the container **and** Lambda jar
-      - awstask % docker build -t gorb/aws-task .
+      - docker build -t gorb/aws-task .
       - docker tag gorb/aws-task:latest 151182332702.dkr.ecr.us-east-2.amazonaws.com/gorb/aws-task:latest
 
       - echo "☁️  Packaging Lambda with SAM"
