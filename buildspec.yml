@@ -3,7 +3,7 @@ version: 0.2
 phases:
   pre_build:
     commands:
-      - echo "🔐 Logging in to ECR"
+      - echo "🔐 Logging in to ECR."
       - aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 151182332702.dkr.ecr.us-east-2.amazonaws.com
       - REPO_URI=151182332702.dkr.ecr.us-east-2.amazonaws.com/gorb/aws-task
       - IMAGE_TAG=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c1-7)
