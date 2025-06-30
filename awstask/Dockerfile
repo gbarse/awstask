@@ -7,7 +7,7 @@ COPY src ./src
 RUN mvn -q -DskipTests package
 
 
-FROM public.ecr.aws/amazoncorretto/amazoncorretto:21-alpine
+FROM public.ecr.aws/amazoncorretto/amazoncorretto:21
 
 ARG JAR_FILE=/workspace/target/*jar
 COPY --from=builder ${JAR_FILE} app.jar
