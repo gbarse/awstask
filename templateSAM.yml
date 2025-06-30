@@ -26,7 +26,7 @@ Resources:
       Environment:
         Variables:
           SNS_TOPIC_ARN: arn:aws:sns:us-east-2:151182332702:GorB-Topic
-          ALB_HOST: !ImportValue GorB-App-ALB-DNS
+          ALB_HOST: "{{resolve:ssm:/gorb/albDns}}"
 
       Policies:
         - SQSPollerPolicy:
