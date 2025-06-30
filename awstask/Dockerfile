@@ -7,7 +7,7 @@ COPY src ./src
 RUN mvn -q -DskipTests package
 
 
-FROM public.ecr.aws/amazoncorretto/amazoncorretto:21
+FROM public.ecr.aws/docker/library/maven:3.9.7-eclipse-temurin-21-alpine
 
 ARG JAR_FILE=/workspace/target/*jar
 COPY --from=builder ${JAR_FILE} app.jar
