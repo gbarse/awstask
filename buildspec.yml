@@ -5,8 +5,8 @@ phases:
     commands:
       - echo "🔐 Logging in to ECR."
       - aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 151182332702.dkr.ecr.us-east-2.amazonaws.com
-      - REPO_URI=151182332702.dkr.ecr.us-east-2.amazonaws.com/gorb/aws-task
-      - IMAGE_TAG=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c1-7)
+      - export REPO_URI=151182332702.dkr.ecr.us-east-2.amazonaws.com/gorb/aws-task
+      - export IMAGE_TAG=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c1-7)
 
   build:
     commands:
@@ -36,5 +36,6 @@ phases:
 
 artifacts:
   files:
-    - imagedefinitions.json
-    - packaged.yml
+    - packaged.yml              # for Lambda stack
+    - ecs-stack.yml             # if stored in repo (you can also inline)
+    - imagedefinitions.json     # optional (only if using CodeDeploy to ECS)
