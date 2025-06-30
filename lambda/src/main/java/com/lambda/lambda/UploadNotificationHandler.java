@@ -15,17 +15,17 @@ public class UploadNotificationHandler implements RequestHandler<SQSEvent, Void>
     private final SnsClient snsClient = SnsClient.create();
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final String topicArn = System.getenv("SNS_TOPIC_ARN");
-    private static final String ALB_HOST = System.getenv("ALB_HOST");
-
+    private static final String PUBLIC_HOST =
+        Optional.ofNullable(System.getenv("APP_PUBLIC_HOST")).orElse("");
     @Override
     public Void handleRequest(SQSEvent event, Context context) {
         for (SQSEvent.SQSMessage message : event.getRecords()) {
             try {
                 ImageMetadata metadata = objectMapper.readValue(message.getBody(), ImageMetadata.class);
 
-                String downloadLink = "https://" + ALB_HOST
-                        + "/download?fileName="
-                        + URLEncoder.encode(metadata.getName(), StandardCharsets.UTF_8);
+                String downloadLink = "https://" + PUBLIC_HOST
+        + "/download?fileName="
+        + URLEncoder.encode(metadata.getName(), StandardCharsets.UTF_8);
 
                 String msg = """
                     📷 An image has been uploaded.
