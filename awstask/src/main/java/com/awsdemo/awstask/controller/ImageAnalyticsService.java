@@ -23,7 +23,7 @@ public class ImageAnalyticsService {
     private void incrementCounter(String imageName, String attr) {
         dynamo.updateItem(b -> b
                 .tableName(TABLE)
-                .key(Map.of("image_name", AttributeValue.fromS(imageName)))
+                .key(Map.of("image_id", AttributeValue.fromS(imageName)))  
                 .updateExpression("ADD #c :inc")
                 .expressionAttributeNames(Map.of("#c", attr))
                 .expressionAttributeValues(Map.of(":inc", AttributeValue.fromN("1")))
