@@ -2,15 +2,13 @@ AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: GorB SAM Template (minimal)
 
-# ────────────── global defaults ────────────────────────────────
 Globals:
   Function:
     Runtime: java17
-    MemorySize: 512        # MB
-    Timeout: 30            # seconds
+    MemorySize: 512        
+    Timeout: 30            
     Tracing: Active
 
-# ────────────── resources ──────────────────────────────────────
 Resources:
 
   GorBUploadsNotificationFunction:
@@ -19,8 +17,6 @@ Resources:
       FunctionName: GorB-UploadsNotificationFunction
       Handler: com.lambda.lambda.UploadNotificationHandler::handleRequest
 
-      # Path to the shaded JAR that 'mvn package' puts under lambda/target/
-      # (sam build / sam package will upload this for you)
       CodeUri: lambda/target/lambda-0.0.1-SNAPSHOT.jar
 
       Environment:
