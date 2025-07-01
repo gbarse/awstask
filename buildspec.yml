@@ -14,7 +14,7 @@ phases:
       - mvn -q -f awstask/pom.xml -DskipTests package
 
       # ── 2️⃣  build + tag Docker image ───────────────────────────
-      - echo "🐳  Building Docker image"
+      - echo "🐳  Building Docker imageo"
       - docker build -t $REPO_URI:$IMAGE_TAG -f awstask/Dockerfile awstask
       - docker tag  $REPO_URI:$IMAGE_TAG  $REPO_URI:latest
 
