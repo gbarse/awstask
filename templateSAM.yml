@@ -2,6 +2,11 @@ AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: GorB SAM Template (minimal)
 
+Parameters:
+  ImageAppBaseUrlExport:                
+    Type: String
+    Default: GorB-ImageApp-BaseUrl
+
 Globals:
   Function:
     Runtime: java17
@@ -22,7 +27,7 @@ Resources:
       Environment:
         Variables:
           SNS_TOPIC_ARN: arn:aws:sns:us-east-2:151182332702:GorB-Topic
-          APP_PUBLIC_IP: 3.148.63.57
+          APP_BASE_URL: !ImportValue GorB-ImageApp-BaseUrl
 
       Policies:
         - SQSPollerPolicy:
