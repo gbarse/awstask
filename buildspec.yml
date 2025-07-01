@@ -10,7 +10,6 @@ phases:
 
   build:
     commands:
-      # ── 1️⃣  build the web-app JAR ───────────────────────────────
       - echo "🛠  Building Spring-Boot web app"
       - mvn -q -f awstask/pom.xml -DskipTests package
 
