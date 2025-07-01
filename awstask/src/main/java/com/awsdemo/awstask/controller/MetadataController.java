@@ -155,7 +155,7 @@ public class MetadataController {
 
     @GetMapping("/")
     public String health() {
-        return "OK";   // No EC2MetadataUtils!
+        return "OK !!";   // No EC2MetadataUtils!
     }
 
 
