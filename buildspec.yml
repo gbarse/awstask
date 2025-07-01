@@ -36,6 +36,6 @@ phases:
 
 artifacts:
   files:
-    - packaged.yml              # for Lambda stack
-    - ecs-stack.yml             # if stored in repo (you can also inline)
-    - imagedefinitions.json     # optional (only if using CodeDeploy to ECS)
+    - packaged.yml              
+    - ecs-stack.yml             
+    - imagedefinitions.json     
